@@ -14,7 +14,9 @@ class NTUDataset(Dataset):
         self.kp_shape = params.kp_shape
         self.seg_size = params.seg_size
         self.data_path = params.data_path
+        self.num_channels = params.num_channels
         self.transform = transform
+        self.mean, self.std = self.get_mean_std()
     
     def __len__(self):
         # Number of samples in the dataset
@@ -30,6 +32,10 @@ class NTUDataset(Dataset):
         
         if self.transform:
             sample_kp = self.transform(sample_kp)
+            
+        # Normalize with mean and std
+        sample_kp -= self.mean
+        sample_kp /= self.std
         
         return sample_kp, action_class
     
@@ -69,6 +75,24 @@ class NTUDataset(Dataset):
             
         padded_kp = torch.cat((padded_kp, sample_kp[:additional_frames]))
         return padded_kp
+    
+    def get_mean_std(self):
+        mean_path = f'../mean_std/mean_{self.seg_size}_{self.kp_shape[0]}_{self.kp_shape[1]}.npy'
+        std_path = f'../mean_std/std_{self.seg_size}_{self.kp_shape[0]}_{self.kp_shape[1]}.npy'
+        try:
+            # Read pickled file for mean and std
+            mean = torch.from_numpy(np.load(mean_path))
+            std = torch.from_numpy(np.load(std_path))
+        except OSError:
+            print('Evaluating mean and std for the training set...')
+            X = torch.tensor([self.__getitem__(idx) for idx in range(len((self.sample_set)))])
+            X = X.view(-1, self.seg_size, self.num_channels, self.kp_shape[0], self.kp_shape[1])
+            mean = torch.mean(X, axis=0)
+            std = torch.std(X, axis=0)
+            np.save(mean_path, mean.numpy())
+            np.save(std_path, std.numpy())
+            
+        return mean, std
             
 
 

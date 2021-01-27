@@ -20,11 +20,11 @@ def get_train_val_loader(params, val_pct=0.2):
     print(f'Train samples: {len(train_samples)} || Validation samples: {len(val_samples)}')
     
     # Apply transform to normalize the data
-    transform = transforms.Normalize((0.5), (0.5))
+    # transform = transforms.Normalize((0.5), (0.5))
     
     # Load train and validation dataset
-    train_set = NTUDataset(sample_set=train_samples, params=params, transform=transform)
-    val_set = NTUDataset(sample_set=val_samples, params=params, transform=transform)
+    train_set = NTUDataset(sample_set=train_samples, params=params, transform=None)
+    val_set = NTUDataset(sample_set=val_samples, params=params, transform=None)
 
     train_loader = DataLoader(train_set, batch_size=params.BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=params.BATCH_SIZE, shuffle=True)
