@@ -8,12 +8,12 @@ from torch.utils.data import Dataset, DataLoader
 
 class NTUDataset(Dataset):
     
-    def __init__(self, data_path, sample_set, kp_shape=(25, 3), seg_size=40):
+    def __init__(self, sample_set, params):
         # Initialize all parameters for the model
         self.sample_set = sample_set
-        self.kp_shape = kp_shape
-        self.seg_size = seg_size
-        self.data_path = data_path
+        self.kp_shape = params.kp_shape
+        self.seg_size = params.seg_size
+        self.data_path = params.data_path
     
     def __len__(self):
         # Number of samples in the dataset
@@ -37,7 +37,9 @@ class NTUDataset(Dataset):
         # For now, I am just considering one participant for each video segment and taking 'skel_body0' as input keypoints
         kps = self.augment_kp(data['skel_body0'])
         action_class = int(sample_name.split('A')[1][:3])
-        return kps, action_class
+        # Before returning the sample_kp, change its shape in the form: (seg_size, 1, 25, 3)
+        # This is to treat each frame as a form of single channel input image
+        return kps.view(self.seg_size, 1, self.kp_shape[0], self.kp_shape[1]), action_class
     
     def augment_kp(self, sample_kp):
         # Temporally augment video segment based on the minimum segment size for the dataset
@@ -120,7 +122,7 @@ def get_train_val_set(data_path, val_pct=0.2, temporal_aug_k=3):
 
 if __name__ == '__main__':
     # Sample code on how to load the dataset and the loader
-    train_samples, val_samples = get_train_val_set(data_path=data_dir, val_pct=0.2)
+    train_samples, val_samples = get_train_val_set(data_path=data_dir, val_pct=0.2, temporal_aug_k=3)
     print(f'Train samples: {len(train_samples)} || Validation samples: {len(val_samples)}')
     
     # Load train and validation dataset
