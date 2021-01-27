@@ -14,16 +14,16 @@ class ConvLSTM(nn.Module):
         
         self.conv1 = nn.Conv2d(1, self.bcc, kernel_size=(2, 1))
         self.conv2 = nn.Conv2d(self.bcc, 2*self.bcc, kernel_size=(2, 1))
-        self.conv3 = nn.Conv2d(2*self.bcc, 4*self.bcc, kernel_size(2, 1))
+        self.conv3 = nn.Conv2d(2*self.bcc, 4*self.bcc, kernel_size=(2, 1))
         
         self._to_linear, self._to_lstm = None, None
-        x = torch.randn(params.BATCH_SIZE*params.num_classes, params.num_channels, params.num_joints, params.num_coord)
+        x = torch.randn(params.BATCH_SIZE, params.seg_size, params.num_channels, params.num_joints, params.num_coord)
         self.convs(x)
         
         self.lstm = nn.LSTM(input_size=self._to_lstm, hidden_size=256, num_layers=1, batch_first=True)
         
         self.fc1 = nn.Linear(256, self.bcc*1)
-        self.fc2 = nn.Linear(self.bcc*1, params.bcc)
+        self.fc2 = nn.Linear(self.bcc*1, params.num_classes)
         
     def convs(self, x):
         batch_size, timesteps, c, h, w = x.size()
@@ -43,7 +43,6 @@ class ConvLSTM(nn.Module):
     
     def forward(self, x):
         batch_size, timesteps, c, h, w = x.size()
-        x = x.view(batch_size*timesteps, c, h, w)
         cnn_out = self.convs(x)
         r_in = cnn_out.view(batch_size, timesteps, -1)
         self.lstm.flatten_parameters()

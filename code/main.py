@@ -4,22 +4,23 @@ from easydict import EasyDict as edict
 import torch
 import torch.nn as nn
 from torch import optim
+from torch.utils.data import DataLoader 
 
 from datetime import datetime
 from sklearn.metrics import confusion_matrix, accuracy_score
 from tqdm import tqdm
 
-from dataset import NTUDataset
+from dataset import NTUDataset, get_train_val_set
 from model import ConvLSTM
 
 
 def get_train_val_loader(params, val_pct=0.2):
-    train_samples, val_samples = get_train_val_set(data_path=data_dir, val_pct=val_pct, temporal_aug_k=params.temporal_aug_k)
+    train_samples, val_samples = get_train_val_set(data_path=params.data_path, val_pct=val_pct, temporal_aug_k=params.temporal_aug_k)
     print(f'Train samples: {len(train_samples)} || Validation samples: {len(val_samples)}')
     
     # Load train and validation dataset
-    train_set = NTUDataset(data_path=params.data_path, sample_set=train_samples)
-    val_set = NTUDataset(data_path=params.data_path, sample_set=val_samples)
+    train_set = NTUDataset(sample_set=train_samples, params=params)
+    val_set = NTUDataset(sample_set=val_samples, params=params)
 
     train_loader = DataLoader(train_set, batch_size=params.BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=params.BATCH_SIZE, shuffle=True)
@@ -44,19 +45,19 @@ def build_test_stats(preds, actual, acc):
 
 def train(model, train_loader, loss_function, optimizer, params):
     print('Training...')
-    for epoch in range(params.num_epochs):
+    for epoch in range(params.n_epochs):
         for batch in tqdm(train_loader):
-            inputs, labels = batch[0].to(device), batch[1].to(device)
+            inputs, labels = batch[0].to(device).float(), batch[1].to(device)
             optimizer.zero_grad()
 
-            outputs = net(inputs)
+            outputs = model(inputs)
             loss = loss_function(outputs, labels)
             loss.backward()
             optimizer.step()
 
         print(f'Epoch: {epoch} | Loss: {loss}')
 
-    return net
+    return model
 
 def test(model, test_loader):
     print('Testing...')
@@ -69,7 +70,7 @@ def test(model, test_loader):
     with torch.no_grad():
         for batch in tqdm(test_loader):
             inputs, labels = batch
-            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.to(device).float(), labels.to(device)
             class_outputs = model(inputs)
             _, class_prediction = torch.max(class_outputs.data, 1)
             total += labels.size(0)
@@ -90,11 +91,11 @@ def main(params):
     
     # Use parallel computing if available
     if device.type == 'cuda' and n_gpus > 1:
-        model = nn.Parallel(model, list(range(n_gpus)))
+        model = nn.DataParallel(model, list(range(n_gpus)))
         
     # Loss Function and Optimizer (can use weight=class_weights if it is a disbalanced dataset)
     loss_function = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(net.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
     
     # Get train and validation loaders
     train_loader, val_loader = get_train_val_loader(params, val_pct=0.2)

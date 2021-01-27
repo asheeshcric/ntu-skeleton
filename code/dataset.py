@@ -36,7 +36,8 @@ class NTUDataset(Dataset):
         # dict_keys(['file_name', 'nbodys', 'njoints', 'skel_body0', 'rgb_body0', 'depth_body0', 'skel_body1', 'rgb_body1', 'depth_body1'])
         # For now, I am just considering one participant for each video segment and taking 'skel_body0' as input keypoints
         kps = self.augment_kp(data['skel_body0'])
-        action_class = int(sample_name.split('A')[1][:3])
+        # Subtracting -1 from the action_class to make it compatible with Pytorch labels (starts from 0 to 119)
+        action_class = int(sample_name.split('A')[1][:3]) - 1
         # Before returning the sample_kp, change its shape in the form: (seg_size, 1, 25, 3)
         # This is to treat each frame as a form of single channel input image
         return kps.view(self.seg_size, 1, self.kp_shape[0], self.kp_shape[1]), action_class
