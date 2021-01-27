@@ -38,7 +38,7 @@ def save_model(model):
     torch.save(model.state_dict(), f'ntu_lstm_{current_time}.pth')
     
     
-def build_test_stats(preds, actual, acc):
+def build_test_stats(preds, actual, acc, params):
     print(f'Model accuracy: {acc}')
     
     # For confusion matrix
@@ -110,7 +110,7 @@ def main(params):
     
     # Validate the model
     preds, actual, acc = test(model, val_loader)
-    build_stats(preds, actual, acc, params)
+    build_test_stats(preds, actual, acc, params)
     
     
 
