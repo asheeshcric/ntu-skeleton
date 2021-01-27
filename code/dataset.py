@@ -8,12 +8,13 @@ from torch.utils.data import Dataset, DataLoader
 
 class NTUDataset(Dataset):
     
-    def __init__(self, sample_set, params):
+    def __init__(self, sample_set, params, transform=None):
         # Initialize all parameters for the model
         self.sample_set = sample_set
         self.kp_shape = params.kp_shape
         self.seg_size = params.seg_size
         self.data_path = params.data_path
+        self.transform = transform
     
     def __len__(self):
         # Number of samples in the dataset
@@ -26,6 +27,9 @@ class NTUDataset(Dataset):
         
         # Process the sample into tensor keypoints for the given index
         sample_kp, action_class = self.read_sample(sample_path, sample_name)
+        
+        if self.transform:
+            sample_kp = self.transform(sample_kp)
         
         return sample_kp, action_class
     
