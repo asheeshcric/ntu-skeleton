@@ -25,10 +25,10 @@ class NTUDataset(Dataset):
     def __getitem__(self, idx):
         # Return a particular item from the dataset
         sample_name = self.sample_set[idx]
-        sample_path = os.path.join(self.data_path, sample_name)
         
         # Process the sample into tensor keypoints for the given index
-        sample_kp, action_class = self.read_sample(sample_path, sample_name)
+        sample_kp, action_class = self.read_sample(sample_name)
+        sample_kp = torch.tensor(sample_kp)
         
         if self.transform:
             sample_kp = self.transform(sample_kp)
@@ -40,7 +40,8 @@ class NTUDataset(Dataset):
         return sample_kp, action_class
     
     # ----- Helper functions -----
-    def read_sample(self, sample_path, sample_name):
+    def read_sample(self, sample_name):
+        sample_path = os.path.join(self.data_path, sample_name)
         data = np.load(sample_path, allow_pickle=True).item()
         # Each data sample has the following keys:
         # dict_keys(['file_name', 'nbodys', 'njoints', 'skel_body0', 'rgb_body0', 'depth_body0', 'skel_body1', 'rgb_body1', 'depth_body1'])
@@ -50,7 +51,7 @@ class NTUDataset(Dataset):
         action_class = int(sample_name.split('A')[1][:3]) - 1
         # Before returning the sample_kp, change its shape in the form: (seg_size, 1, 25, 3)
         # This is to treat each frame as a form of single channel input image
-        return kps.view(self.seg_size, 1, self.kp_shape[0], self.kp_shape[1]), action_class
+        return np.reshape(kps, (self.seg_size, 1, self.kp_shape[0], self.kp_shape[1])), action_class
     
     def augment_kp(self, sample_kp):
         # Temporally augment video segment based on the minimum segment size for the dataset
@@ -58,9 +59,9 @@ class NTUDataset(Dataset):
         sample_size = sample_kp.shape[0]
         if sample_size < self.seg_size:
             # Pad same frames at the end in order to meet the segment size requirement
-            return self.pad_frames(torch.tensor(sample_kp))
+            return self.pad_frames(sample_kp)
         rand_segments = sorted(random.sample(range(0, sample_size), self.seg_size))
-        sample_kp = torch.tensor(np.take(sample_kp, rand_segments, axis=0))
+        sample_kp = np.take(sample_kp, rand_segments, axis=0)
         return sample_kp
     
     def pad_frames(self, sample_kp):
@@ -70,10 +71,10 @@ class NTUDataset(Dataset):
         sample_size = sample_kp.shape[0]
         additional_frames = self.seg_size - sample_size
         while additional_frames >= sample_size:
-            padded_kp = torch.cat((padded_kp, sample_kp), dim=0)
+            padded_kp = np.concatenate((padded_kp, sample_kp), axis=0)
             additional_frames -= sample_size
             
-        padded_kp = torch.cat((padded_kp, sample_kp[:additional_frames]))
+        padded_kp = np.concatenate((padded_kp, sample_kp[:additional_frames]), axis=0)
         return padded_kp
     
     def get_mean_std(self):
@@ -84,13 +85,14 @@ class NTUDataset(Dataset):
             mean = torch.from_numpy(np.load(mean_path))
             std = torch.from_numpy(np.load(std_path))
         except OSError:
-            print('Evaluating mean and std for the training set...')
-            X = torch.tensor([self.__getitem__(idx) for idx in range(len((self.sample_set)))])
+            print('Evaluating mean and std for the training set...')         
+            X = torch.tensor([self.read_sample(sample_name)[0] for sample_name in self.sample_set])
             X = X.view(-1, self.seg_size, self.num_channels, self.kp_shape[0], self.kp_shape[1])
             mean = torch.mean(X, axis=0)
             std = torch.std(X, axis=0)
             np.save(mean_path, mean.numpy())
             np.save(std_path, std.numpy())
+            print(f'Mean and Std saved successfully!')
             
         return mean, std
             
