@@ -103,7 +103,7 @@ def main(params):
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
     # Get train and validation loaders
-    train_loader, val_loader = get_train_val_loader(params, val_pct=0.2)
+    train_loader, val_loader = get_train_val_loader(params, val_pct=params.val_pct)
     
     # Train the model
     model = train(model, train_loader, loss_function, optimizer, params)
@@ -148,6 +148,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, default='', help='Enter the path to the saved model')
     parser.add_argument('--data_path', type=str, default='/data/zak/graph/ntu/train', help='Dataset path')
     parser.add_argument('--seg_size', type=int, default=50, help='Minimum segment size for each video segment')
+    parser.add_argument('--val_pct', type=float, default=0.2, help='Ratio for the validation set')
     parser.add_argument('--kp_shape', type=int, nargs=2, default=[25, 3], help='(n_joints, n_coordinates) -- (25, 3)')
     parser.add_argument('--BATCH_SIZE', type=int, default=8, help='Batch size for the dataset')
     parser.add_argument('--temporal_aug_k', type=int, default=3, help='Number of temporal augmentations for each sample')
@@ -161,6 +162,7 @@ if __name__ == '__main__':
         'mode': parsed_input.mode,
         'model_path': parsed_input.model_path,
         'kp_shape': parsed_input.kp_shape,
+        'val_pct': parsed_input.val_pct,
         'seg_size': parsed_input.seg_size,
         'data_path': parsed_input.data_path,
         'BATCH_SIZE': parsed_input.BATCH_SIZE,
@@ -174,7 +176,7 @@ if __name__ == '__main__':
         'num_coord': 3, # number of coordinates (x, y, z)
     })
     
-    print(params)
+    # print(params)
     
     # Check for GPUs
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
