@@ -35,7 +35,7 @@ def get_train_val_loader(params, val_pct=0.2):
 def save_model(model):
     current_time = datetime.now()
     current_time = current_time.strftime("%m_%d_%Y_%H_%M")
-    torch.save(model.state_dict(), f'ntu_lstm_{current_time}.pth')
+    torch.save(model.state_dict(), f'../saved_models/ntu_lstm_{current_time}.pth')
     
     
 def build_test_stats(preds, actual, acc, params):
@@ -46,6 +46,7 @@ def build_test_stats(preds, actual, acc, params):
     actual = [int(k) for k in actual]
 
     cf = confusion_matrix(actual, preds, labels=list(range(params.num_classes)))
+    print(cf)
 
 def train(model, train_loader, loss_function, optimizer, params):
     print('Training...')
@@ -107,8 +108,25 @@ def main(params):
     # Train the model
     model = train(model, train_loader, loss_function, optimizer, params)
     save_model(model)
+
+    # Get training accuracy
+    preds, actual, acc = test(model, train_loader)
+    build_test_stats(preds, actual, acc, params)
     
     # Validate the model
+    preds, actual, acc = test(model, val_loader)
+    build_test_stats(preds, actual, acc, params)
+    
+
+## Optional code to load and test a model
+def load_test_model(params, model_path):
+    model = ConvLSTM(params=params).to(device)
+    # Use this to fix keyError in the model when using DataParallel while training
+    if device.type == 'cuda' and n_gpus > 1:
+        model = nn.DataParallel(model, list(range(n_gpus)))
+    train_loader, val_loader = get_train_val_loader(params, val_pct=0.2)
+    model.load_state_dict(torch.load(model_path))
+    model.eval() # To set dropout and batchnormalization OFF
     preds, actual, acc = test(model, val_loader)
     build_test_stats(preds, actual, acc, params)
     
@@ -126,6 +144,8 @@ if __name__ == '__main__':
     """
 
     parser = argparse.ArgumentParser(description='NTU Activity Recognition with 3D Keypoints')
+    parser.add_argument('--mode', type=str, default='train', help='train || inference')
+    parser.add_argument('--model_path', type=str, default='', help='Enter the path to the saved model')
     parser.add_argument('--data_path', type=str, default='/data/zak/graph/ntu/train', help='Dataset path')
     parser.add_argument('--seg_size', type=int, default=50, help='Minimum segment size for each video segment')
     parser.add_argument('--kp_shape', type=int, nargs=2, default=[25, 3], help='(n_joints, n_coordinates) -- (25, 3)')
@@ -138,6 +158,8 @@ if __name__ == '__main__':
     parsed_input = parser.parse_args()
 
     params = edict({
+        'mode': parsed_input.mode,
+        'model_path': parsed_input.model_path,
         'kp_shape': parsed_input.kp_shape,
         'seg_size': parsed_input.seg_size,
         'data_path': parsed_input.data_path,
@@ -150,14 +172,23 @@ if __name__ == '__main__':
         'num_channels': 1, # channel for each frame
         'num_joints': 25, # joints used in each frame
         'num_coord': 3, # number of coordinates (x, y, z)
-
     })
+    
+    print(params)
     
     # Check for GPUs
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     n_gpus = torch.cuda.device_count()
     print(f'Number of GPUs available: {n_gpus}')
     
-    # Run the train/val code
-    main(params)
+    if params.mode == 'train':
+        # Run the train/val code
+        main(params)
+    else:
+        # Run as this: python main.py --mode="inference" --model_path="../saved_models/ntu_lstm_01_27_2021_15_53.pth"
+        if not params.model_path:
+            print('Please enter path to the saved model!: python main.py --mode="inference" --model_path="../saved_models/ntu_lstm_01_27_2021_15_53.pth"')
+        else:
+            # For loading and testing model
+            load_test_model(params, model_path=params.model_path)
     
